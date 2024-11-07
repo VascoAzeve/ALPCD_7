@@ -20,9 +20,8 @@ def salary(job_id: str):
 
     # Monta a URL para o job específico
 
-    params = {"api_key": apikey}
     params = {
-        "apikey": apikey,
+        "api_key": apikey,
         "id": job_id,
     }
 
