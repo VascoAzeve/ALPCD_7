@@ -5,58 +5,58 @@ import json
 app = typer.Typer()
 
 url = "https://api.itjobs.pt/job/search.json"
-apikey = "422295b885ee1bc7fa94f330fbe85de2" 
+api_key = "422295b885ee1bc7fa94f330fbe85de2"
 
 headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.121 Safari/537.36"
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
 }
 
 @app.command()
-def search(locality: str = typer.Argument(...), company: str = typer.Argument(...), limit: int = typer.Argument(...)):
-    # Monta os parâmetros da requisição
+def search(localidade: str, empresa: str, numero_trabalhos: int):
+    # Definir os parâmetros da busca
     params = {
-        "api_key": apikey,
-        "q": company,  # Realiza busca pela empresa
-        "limit": limit,  # Número de resultados a mostrar
-        "page": 1,  # Página inicial (pode ser ajustada se necessário)
-        "type": "1",  # Filtra apenas trabalhos Full-time (id 1 corresponde a Full-time)
-        "contract": "2",  # Exclui outros contratos, filtrando para contratos sem termo
+        "api_key": api_key,
+        "q": empresa,
+        "locations": localidade,
+        "limit": numero_trabalhos,
+        "full_time": "true"  # Filtra apenas vagas full-time
     }
 
-    # Adiciona o filtro de localidade, se fornecido
-    if locality:
-        params["location"] = locality
-
-    # Faz a requisição para a API
-    response = requests.get(url, params=params, headers=headers)
-
-    # Verifica o status da resposta
-    if response.status_code != 200:
-        typer.echo(f"Erro na requisição: {response.status_code} - {response.text}")
+    try:
+        # Fazer a requisição à API
+        response = requests.get(url, params=params, headers=headers)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        typer.echo(f"Erro na requisição: {e}")
         raise typer.Exit(code=1)
 
-    # Converte a resposta JSON para um dicionário
-    data = response.json()
+    try:
+        # Processar a resposta em formato JSON
+        data = response.json()
+    except ValueError:
+        typer.echo("Erro: Resposta não está em formato JSON.")
+        raise typer.Exit(code=1)
 
-    # Verifica se há resultados
-    if "results" in data and len(data["results"]) > 0:
-        # Exibe os resultados em formato JSON
-        output = []
-        for job in data["results"]:
-            job_data = {
-                "id": job.get("id", "N/A"),
-                "company": job.get("company", {}).get("name", "N/A"),
-                "title": job.get("title", "N/A"),
-                "location": [loc["name"] for loc in job.get("locations", [])],  # Lista de localidades
-                "publishedAt": job.get("publishedAt", "N/A"),
-                "description": job.get("body", "N/A")
-            }
-            output.append(job_data)
+    # Verificar se há resultados
+    if "results" not in data or not data["results"]:
+        typer.echo(f"Não foram encontradas vagas para a empresa {empresa} na localidade {localidade}.")
+        raise typer.Exit(code=1)
 
-        # Exibe os resultados no formato JSON
-        typer.echo(json.dumps(output, indent=4))
-    else:
-        typer.echo("Nenhuma vaga encontrada para os critérios fornecidos.")
+    # Filtrar as vagas e exibir no formato JSON
+    vagas = []
+    for job in data["results"]:
+        job_data = {
+            "titulo": job.get("title", "N/A"),
+            "empresa": job.get("company", {}).get("name", "N/A"),
+            "descricao": job.get("description", "N/A"),
+            "data_publicacao": job.get("publishedAt", "N/A"),
+            "localizacao": job.get("locations", [{}])[0].get("name", "N/A"),
+            "salario": job.get("wage", "N/A")
+        }
+        vagas.append(job_data)
+
+    # Exibir resultado em formato JSON
+    typer.echo(json.dumps(vagas, indent=4, ensure_ascii=False))
 
 if __name__ == "__main__":
     app()
